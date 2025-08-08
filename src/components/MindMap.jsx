@@ -185,67 +185,171 @@ export default function MindMap({ onAnnounce }) {
 
   function expandCategory(group, hubMeta, payload, tooltip, showTooltip, hideTooltip) {
     const categoryKey = hubMeta.key;
-    const items = payload?.[categoryKey] || [];
+    const rawItems = payload?.[categoryKey] || [];
     const angle = Math.atan2(hubMeta.y, hubMeta.x);
 
-    const nodes = items.slice(0, 12).map((item, i) => {
-      const r = 70 + (i % 3) * 32;
-      const theta = angle + ((Math.floor(i / 3) - 2) * 0.18);
+    // Remove any existing expansion of this category before drawing a new one
+    group.selectAll(`g[data-branch="${categoryKey}"]`).remove();
+
+    // Prepare nodes with nicer arc spread and truncated labels
+    const items = rawItems.slice(0, 16);
+    const baseRadius = 92;
+    const maxRadius = 220;
+    const arcSpread = Math.min(Math.PI / 1.8, 0.15 * items.length + Math.PI / 6);
+
+    const nodes = items.map((item, idx) => {
+      const labelRaw = typeof item === 'string' ? item : (item.text || JSON.stringify(item));
+      const label = labelRaw.length > 28 ? `${labelRaw.slice(0, 28)}…` : labelRaw;
+      const normalized = items.length <= 1 ? 0 : (idx / (items.length - 1)) - 0.5; // -0.5..0.5
+      const theta = angle + normalized * arcSpread;
+      const ring = baseRadius + (idx % 3) * 34 + Math.floor(idx / 6) * 18;
       return {
-        label: typeof item === 'string' ? item : (item.text || JSON.stringify(item)),
-        x: hubMeta.x + Math.cos(theta) * r,
-        y: hubMeta.y + Math.sin(theta) * r,
+        idx,
+        label,
+        x: hubMeta.x + Math.cos(theta) * ring,
+        y: hubMeta.y + Math.sin(theta) * ring,
       };
+    });
+
+    // De-overlap using a lightweight force simulation
+    const sim = d3.forceSimulation(nodes)
+      .force('collide', d3.forceCollide(d => 16 + Math.min(70, d.label.length * 3.2)).iterations(2))
+      .force('radial', d3.forceRadial((d, i) => baseRadius + 40 + (i % 5) * 16, hubMeta.x, hubMeta.y).strength(0.25))
+      .alpha(0.9)
+      .stop();
+    for (let i = 0; i < 120; i += 1) sim.tick();
+
+    // Clamp too-distant nodes back towards the hub
+    nodes.forEach((n) => {
+      const dx = n.x - hubMeta.x;
+      const dy = n.y - hubMeta.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxRadius) {
+        const scale = maxRadius / dist;
+        n.x = hubMeta.x + dx * scale;
+        n.y = hubMeta.y + dy * scale;
+      }
     });
 
     const branch = group.append('g').attr('data-branch', categoryKey);
 
-    branch.selectAll('line')
-      .data(nodes)
+    // Curved links with draw-in animation
+    branch.selectAll('path.link-leaf')
+      .data(nodes, d => d.idx)
       .enter()
-      .append('line')
-      .attr('x1', hubMeta.x)
-      .attr('y1', hubMeta.y)
-      .attr('x2', hubMeta.x)
-      .attr('y2', hubMeta.y)
+      .append('path')
+      .attr('class', 'link-leaf')
+      .attr('fill', 'none')
       .attr('stroke', hubMeta.color)
-      .attr('stroke-opacity', 0.6)
+      .attr('stroke-opacity', 0.5)
+      .attr('stroke-width', 2)
+      .attr('d', d => {
+        const cx = (hubMeta.x + d.x) / 2 + (d.y - hubMeta.y) * 0.12;
+        const cy = (hubMeta.y + d.y) / 2 - (d.x - hubMeta.x) * 0.12;
+        return `M${hubMeta.x},${hubMeta.y} Q ${cx},${cy} ${d.x},${d.y}`;
+      })
+      .attr('stroke-dasharray', function () { const len = this.getTotalLength(); return `${len} ${len}`; })
+      .attr('stroke-dashoffset', function () { return this.getTotalLength(); })
       .transition()
-      .duration(500)
-      .attr('x2', d => d.x)
-      .attr('y2', d => d.y);
+      .duration(800)
+      .ease(d3.easeCubicOut)
+      .attr('stroke-dashoffset', 0);
 
+    // Leaf groups with interactive hover scale
     const leaf = branch.selectAll('g.leaf')
-      .data(nodes)
+      .data(nodes, d => d.idx)
       .enter()
       .append('g')
       .attr('class', 'leaf')
-      .attr('transform', d => `translate(${hubMeta.x},${hubMeta.y})`)
+      .attr('transform', `translate(${hubMeta.x},${hubMeta.y})`)
+      .style('cursor', 'pointer')
       .on('mouseenter', function (event, d) {
+        d3.select(this)
+          .raise()
+          .transition()
+          .duration(180)
+          .attr('transform', `translate(${d.x},${d.y}) scale(1.12)`);
         showTooltip(d.label, event.pageX, event.pageY);
       })
-      .on('mouseleave', hideTooltip);
+      .on('mousemove', function (event, d) {
+        showTooltip(d.label, event.pageX, event.pageY);
+      })
+      .on('mouseleave', function () {
+        const datum = d3.select(this).datum();
+        d3.select(this)
+          .transition()
+          .duration(160)
+          .attr('transform', `translate(${datum.x},${datum.y}) scale(1)`);
+        hideTooltip();
+      });
 
     leaf.append('circle')
       .attr('r', 0)
       .attr('fill', hubMeta.color)
       .attr('opacity', 0.9)
       .transition()
-      .duration(500)
-      .attr('r', 12)
-      .attr('transform', d => `translate(${d.x - hubMeta.x},${d.y - hubMeta.y})`);
+      .duration(650)
+      .ease(d3.easeBackOut.overshoot(1.6))
+      .attr('r', 13)
+      .on('end', function () {
+        // Subtle one-shot pulse
+        const g = d3.select(this.parentNode);
+        g.append('circle')
+          .attr('class', 'pulse')
+          .attr('r', 13)
+          .attr('fill', 'none')
+          .attr('stroke', hubMeta.color)
+          .attr('stroke-opacity', 0.5)
+          .attr('stroke-width', 2)
+          .transition()
+          .duration(1200)
+          .ease(d3.easeCubicOut)
+          .attr('r', 28)
+          .attr('stroke-opacity', 0)
+          .remove();
+      });
 
-    leaf.append('text')
+    // Label group with background rect for readability
+    const labels = leaf.append('g').attr('class', 'label');
+
+    labels.append('text')
       .attr('text-anchor', 'middle')
-      .attr('y', -16)
-      .attr('fill', '#eaeaff')
-      .attr('font-size', 11)
-      .text(d => d.label)
+      .attr('dy', -18)
+      .attr('fill', '#eef1ff')
+      .attr('font-size', 12)
       .attr('opacity', 0)
+      .text(d => d.label);
+
+    // Compute text bboxes and insert rounded background rects
+    labels.each(function () {
+      const gSel = d3.select(this);
+      const tSel = gSel.select('text');
+      const bbox = tSel.node().getBBox();
+      gSel.insert('rect', 'text')
+        .attr('class', 'label-bg')
+        .attr('x', bbox.x - 6)
+        .attr('y', bbox.y - 2)
+        .attr('rx', 6)
+        .attr('ry', 6)
+        .attr('width', bbox.width + 12)
+        .attr('height', bbox.height + 4)
+        .attr('fill', 'rgba(22,23,43,0.9)')
+        .attr('stroke', 'rgba(255,255,255,0.12)')
+        .attr('stroke-width', 1);
+    });
+
+    // Final entrance motion for leaves and fade-in of labels
+    leaf.transition()
+      .delay(120)
+      .duration(700)
+      .ease(d3.easeBackOut.overshoot(1.4))
+      .attr('transform', d => `translate(${d.x},${d.y})`);
+
+    labels.select('text')
       .transition()
       .delay(300)
-      .attr('opacity', 0.9)
-      .attr('transform', d => `translate(${d.x - hubMeta.x},${d.y - hubMeta.y})`);
+      .duration(420)
+      .attr('opacity', 0.95);
   }
 
   function onSubmit(e) {
