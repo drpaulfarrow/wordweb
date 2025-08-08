@@ -1,12 +1,27 @@
-# React + Vite
+# WordWeb – Interactive Mind Map
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Explore any word through definitions, synonyms, antonyms, idioms, translations, conjugations, pop culture and rhymes in an interactive mind map.
 
-Currently, two official plugins are available:
+## Tech
+- Front-end: React + Vite + D3
+- Back-end: Express (Node.js), Axios, LRU cache
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Development
 
-## Expanding the ESLint configuration
+Install dependencies and run both servers:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+- Frontend: http://localhost:5173
+- API: http://localhost:5174 (proxied to /api from the frontend)
+
+## Features (MVP)
+- Brain-shaped central node with animated branches for 8 categories
+- Zoom/pan, click to expand, hover tooltips
+- Aggregated API with caching
+
+## License
+MIT

@@ -1,11 +1,101 @@
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #f4f4f4;
+:root {
+  --bg: #0f1020;
+  --panel: #16172b;
+  --text: #f7f7fb;
+  --muted: #b9b9d3;
+  --accent: #7c6cff;
+  --accent-2: #4dd0e1;
+  --success: #4caf50;
+  --warning: #ffb74d;
+  --danger: #ef5350;
 }
 
-div {
-  text-align: center;
-  margin-top: 50px;
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  margin: 0;
+  color: var(--text);
+  background: radial-gradient(1200px 600px at 10% -10%, #1b1c3b 0%, #0f1020 60%), var(--bg);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.brand .brain {
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 0 6px rgba(124, 108, 255, 0.6));
+}
+
+.searchbar {
+  display: flex;
+  gap: 8px;
+  background: color-mix(in oklab, var(--panel) 92%, #ffffff 8%);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 12px;
+  border-radius: 12px;
+  width: min(760px, 92%);
+}
+
+.searchbar input {
+  flex: 1;
+  outline: none;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.button {
+  background: linear-gradient(135deg, var(--accent), #a68cff);
+  border: none;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.canvas-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+svg.mindmap {
+  width: 100%;
+  height: calc(100vh - 90px);
+  display: block;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(22, 23, 43, 0.9);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-width: 240px;
 }
